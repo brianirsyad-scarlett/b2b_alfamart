@@ -1,8 +1,8 @@
-name: Monthly Report (1 AM WIB on 1st day)
+name: Monthly Report (Daily at 1 AM WIB)
 
 on:
   schedule:
-    - cron: '0 18 1 * *'   # 18:00 UTC on day 1 = 01:00 WIB on day 2
+    - cron: '0 18 * * *'   # 18:00 UTC = 01:00 WIB next day (runs daily)
   workflow_dispatch:
 
 jobs:
