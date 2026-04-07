@@ -1,9 +1,7 @@
-name: Daily Report (1 AM WIB)
+name: Daily Report (Manual Only)
 
 on:
-  schedule:
-    - cron: '0 18 * * *'   # 18:00 UTC = 01:00 WIB next day
-  workflow_dispatch:        # allow manual trigger
+  workflow_dispatch:        # manual trigger only
 
 jobs:
   run-daily:
