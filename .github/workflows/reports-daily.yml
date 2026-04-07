@@ -1,0 +1,24 @@
+name: Daily Reports (1 AM WIB)
+
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 18:00 UTC = 01:00 WIB next day
+  workflow_dispatch:        # manual trigger
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install selenium webdriver-manager pyotp
+      - run: python report_daily.py
+        env:
+          TOTP_SECRET: ${{ secrets.TOTP_SECRET }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daily-reports
+          path: /tmp/downloads/
+          retention-days: 7
