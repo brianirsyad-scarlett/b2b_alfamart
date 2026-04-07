@@ -17,7 +17,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 # ========== CONFIGURATION ==========
 USERNAME = "O-0108_10"
 PASSWORD = "Scarlett2024!"
-MONTH = "2026-04"          # YYYY-MM (e.g., 2026-04 for April 2026)
 
 # ========== CATEGORY SELECTION ==========
 CATEGORIES_TO_DOWNLOAD = {
@@ -99,9 +98,13 @@ def close_popup():
     except:
         driver.execute_script("document.querySelectorAll('.modal, .popup').forEach(m => m.style.display='none');")
 
-def process_month():
-    print(f"\n--- Processing month: {MONTH} (aggregated) ---")
-    set_month_range(MONTH)
+def process_month(year_month):
+    """Process a single month (year_month = 'YYYY-MM') and return (success, total)."""
+    print(f"\n{'='*50}")
+    print(f"Processing month: {year_month}")
+    print('='*50)
+
+    set_month_range(year_month)
     set_select_value("indicator-filter-report-modular-3", "a")   # Selling Out
     set_select_value("tipe-area-filter-report-modular-3", "DC")
     set_select_value("branch-filter-report-modular-3", "NAS")
@@ -118,14 +121,17 @@ def process_month():
     success = 0
     total = 0
 
+    # Mapping from value to readable name
+    cat_names = {
+        "3222": "BEAUTY LIQUID SOAP", "3251": "BODY LOTION", "3253": "BODY SCRUB",
+        "3252": "BODY SERUM", "3246": "FACE MASK", "3243": "FACIAL CLEANSER TONIC",
+        "3241": "FACIAL WASH SOAP", "3245": "MOISTURIZER", "8012": "PROMOTION GOODS MEMBER",
+        "3249": "SERUM ESSENCE", "3240": "SUNSCREEN", "3232": "WOMEN PARFUME & EDT"
+    }
+
     for cat_val in selected:
-        cat_name = next((name for name, val in {
-            "3222": "BEAUTY LIQUID SOAP", "3251": "BODY LOTION", "3253": "BODY SCRUB",
-            "3252": "BODY SERUM", "3246": "FACE MASK", "3243": "FACIAL CLEANSER TONIC",
-            "3241": "FACIAL WASH SOAP", "3245": "MOISTURIZER", "8012": "PROMOTION GOODS MEMBER",
-            "3249": "SERUM ESSENCE", "3240": "SUNSCREEN", "3232": "WOMEN PARFUME & EDT"
-        }.items() if val == cat_val), cat_val)
-        print(f"\nCategory: {cat_name}")
+        cat_name = cat_names.get(cat_val, cat_val)
+        print(f"\n--- Category: {cat_name} (value={cat_val}) ---")
         set_select_value("category-filter-report-modular-3", cat_val)
         time.sleep(1)
 
@@ -137,7 +143,7 @@ def process_month():
             print(f"❌ Qty failed for {cat_name}")
         else:
             success += 1
-            print(f"✅ Qty succeeded")
+            print(f"✅ Qty succeeded for {cat_name}")
 
         # Value
         total += 1
@@ -148,9 +154,11 @@ def process_month():
             print(f"❌ Value failed for {cat_name}")
         else:
             success += 1
-            print(f"✅ Value succeeded")
+            print(f"✅ Value succeeded for {cat_name}")
 
         time.sleep(2)
+
+    print(f"\nMonth {year_month} completed: {success}/{total} downloads succeeded.")
     return success, total
 
 # --- Main execution ---
@@ -169,57 +177,113 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 driver.implicitly_wait(5)
 
 try:
-    # Login
+    # ---- LOGIN ----
     driver.get("https://b2b.alfamart.co.id/login.php")
+    print("Login page opened.")
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "uname"))).send_keys(USERNAME)
     driver.find_element(By.ID, "upass").send_keys(PASSWORD)
     driver.find_element(By.CSS_SELECTOR, "input.btn[value='Login']").click()
+    print("Login button clicked.")
     time.sleep(3)
 
-    # 2FA
+    # 2FA (automatic)
     try:
         code_field = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.NAME, "code")))
         code = get_totp_code()
         print(f"Using TOTP code: {code}")
         code_field.send_keys(code)
-        driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']").click()
+        submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+        submit_button.click()
+        print("2FA submitted.")
         time.sleep(3)
     except TimeoutException:
         print("No 2FA required.")
 
     close_popup()
 
-    # Navigate to report
+    # ---- WAIT FOR PAGE TO BE READY ----
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, "ul#nav")))
-    laporan = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//a[@class='dir' and text()='Laporan']")))
-    ActionChains(driver).move_to_element(laporan).perform()
+    print("Page ready, top menu found.")
+
+    # ---- NAVIGATION TO MODULAR REPORT ----
+    laporan_link = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//a[@class='dir' and text()='Laporan']"))
+    )
+    ActionChains(driver).move_to_element(laporan_link).perform()
+    print("Hovered over 'Laporan'.")
     time.sleep(1)
-    dashboard = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Dashboard & Modular')]")))
-    dashboard.click()
+
+    dashboard_link = WebDriverWait(driver, 15).until(
+        EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Dashboard & Modular')]"))
+    )
+    dashboard_link.click()
+    print("Clicked Dashboard & Modular.")
     time.sleep(2)
-    for handle in driver.window_handles:
-        if handle != driver.current_window_handle:
-            driver.switch_to.window(handle)
+
+    # Switch to new tab
+    original_tab = driver.current_window_handle
+    for tab in driver.window_handles:
+        if tab != original_tab:
+            driver.switch_to.window(tab)
             break
-    modular = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Report Modular')]")))
-    modular.click()
+    print("Switched to new tab.")
+
+    modular_button = WebDriverWait(driver, 15).until(
+        EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Report Modular')]"))
+    )
+    modular_button.click()
+    print("Clicked Report Modular.")
     time.sleep(3)
 
-    # Select report type
-    perf = driver.find_element(By.ID, "jenis_performace")
-    perf.click()
-    perf.find_element(By.XPATH, "//option[@value='4']").click()
+    # ---- SETUP REPORT PAGE ----
+    perf_dropdown = driver.find_element(By.ID, "jenis_performace")
+    perf_dropdown.click()
+    perf_dropdown.find_element(By.XPATH, "//option[@value='4']").click()
+    print("Selected 'Performance by Item by Store by Day'.")
     time.sleep(2)
+
     wait_for_form()
 
-    # Process month
-    s, t = process_month()
-    print(f"\nMonthly summary: {s}/{t} downloads succeeded.")
-    print("Downloaded files:", os.listdir(download_dir))
+    # ---- DETERMINE MONTHS (current and previous) ----
+    today = datetime.now()
+    current_month = today.strftime("%Y-%m")
+    # Previous month: subtract one month, handle year wrap
+    first_day_this_month = today.replace(day=1)
+    previous_month_date = first_day_this_month - timedelta(days=1)
+    previous_month = previous_month_date.strftime("%Y-%m")
+
+    months_to_process = [current_month, previous_month]
+    print(f"\nWill process months: {months_to_process}")
+
+    total_success = 0
+    total_attempts = 0
+
+    for month in months_to_process:
+        s, t = process_month(month)
+        total_success += s
+        total_attempts += t
+        time.sleep(5)  # pause between months
+
+    print(f"\n{'='*50}")
+    print(f"FINAL SUMMARY (both months)")
+    print(f"Total successful downloads: {total_success} out of {total_attempts}")
+    if total_success == total_attempts:
+        print("✅ All downloads succeeded!")
+    else:
+        print("⚠️ Some downloads failed. Check the alerts above for details.")
+    print('='*50)
+
+    print("Downloaded files in", download_dir)
+    for f in os.listdir(download_dir):
+        print(" -", f)
 
 except Exception as e:
-    print(f"Error: {e}")
+    print(f"An error occurred: {e}")
     traceback.print_exc()
-    driver.save_screenshot("error.png")
+    try:
+        driver.save_screenshot("error_screenshot.png")
+        print("Screenshot saved as error_screenshot.png")
+    except:
+        pass
 finally:
     driver.quit()
