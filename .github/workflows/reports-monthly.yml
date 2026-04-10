@@ -13,6 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -25,3 +30,9 @@ jobs:
         run: python reports_monthly.py
         env:
           TOTP_SECRET: ${{ secrets.TOTP_SECRET }}
+
+      - name: Upload downloaded reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-reports
+          path: /tmp/downloads/
